@@ -6,6 +6,16 @@
     <title>Cabi Snack - #1 Solusi Makan Mahasiswa Sibuk</title>
     <link rel="shortcut icon" href="images/logo-cabi.png" type="image/png">
     
+    <!-- Google tag (gtag.js) GA4 -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-SLERP5BKJ2"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+
+        gtag('config', 'G-SLERP5BKJ2');
+    </script>
+    
     <!-- Google Fonts & Icons -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -354,7 +364,7 @@
 
                         <div>
                             <label class="block text-xs font-bold text-gray-700 mb-1">Nomor WhatsApp <span class="text-red-500">*</span></label>
-                            <input type="tel" id="order-cust-phone" required placeholder="Contoh: 081234567890" class="w-full border border-gray-300 rounded-xl p-3 text-xs sm:text-sm bg-gray-50 focus:bg-white focus:ring-2 focus:ring-cabi-orange outline-none transition">
+                            <input type="tel" id="order-cust-phone" required placeholder="Contoh: 0895346019419" class="w-full border border-gray-300 rounded-xl p-3 text-xs sm:text-sm bg-gray-50 focus:bg-white focus:ring-2 focus:ring-cabi-orange outline-none transition">
                         </div>
 
                         <div class="grid grid-cols-2 gap-3">
@@ -385,18 +395,15 @@
                             <textarea id="order-cust-location" rows="2" placeholder="Contoh: Catatan bumbu dipisah / diambil oleh kawan" class="w-full border border-gray-300 rounded-xl p-3 text-xs sm:text-sm bg-gray-50 focus:bg-white focus:ring-2 focus:ring-cabi-orange outline-none transition"></textarea>
                         </div>
 
+                        <!-- Ringkasan Biaya Bersih -->
                         <div class="bg-orange-50/70 rounded-2xl p-4 border border-orange-200/80 space-y-2 text-xs sm:text-sm">
                             <div class="flex justify-between text-gray-600">
                                 <span>Subtotal Produk:</span>
                                 <span id="summary-subtotal" class="font-bold text-gray-800">Rp 0</span>
                             </div>
-                            <div class="flex justify-between text-gray-600">
-                                <span>Biaya Layanan:</span>
-                                <span id="summary-service-fee" class="font-bold text-gray-800">Rp 2.000</span>
-                            </div>
                             <div class="flex justify-between text-base font-extrabold text-cabi-dark pt-2 border-t border-orange-200">
                                 <span>Total Pembayaran:</span>
-                                <span id="summary-total" class="text-cabi-orange">Rp 2.000</span>
+                                <span id="summary-total" class="text-cabi-orange">Rp 0</span>
                             </div>
                         </div>
 
@@ -413,7 +420,7 @@
         <div class="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 shadow-2xl z-40">
             <div class="flex items-center justify-between mb-2">
                 <span class="text-xs font-bold text-gray-600">Total Pembayaran:</span>
-                <span id="mobile-sticky-total" class="font-heading font-extrabold text-base text-cabi-orange">Rp 2.000</span>
+                <span id="mobile-sticky-total" class="font-heading font-extrabold text-base text-cabi-orange">Rp 0</span>
             </div>
             <button onclick="triggerOrderSubmit()" id="mobile-submit-wa-btn" class="w-full bg-green-600 hover:bg-green-700 text-white font-heading font-bold py-3 rounded-xl text-xs sm:text-sm shadow-md flex items-center justify-center space-x-2">
                 <i class="fa-brands fa-whatsapp text-lg"></i>
@@ -421,6 +428,42 @@
             </button>
         </div>
 
+    </div>
+
+    <!-- ==========================================================================
+         3. MODAL POP-UP SUKSES PESANAN (#order-success-modal)
+         ========================================================================== -->
+    <div id="order-success-modal" class="hidden fixed inset-0 z-50 bg-cabi-dark/80 backdrop-blur-md flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl shadow-2xl p-6 sm:p-8 text-center space-y-4 max-w-md w-full">
+            <!-- Ikon Ceklis Hijau -->
+            <div class="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto shadow-inner">
+                <span class="material-symbols-outlined text-4xl font-extrabold">check_circle</span>
+            </div>
+
+            <!-- Judul & ID Order -->
+            <div class="space-y-1">
+                <span class="text-[10px] font-bold tracking-wider uppercase bg-green-100 text-green-700 px-3 py-1 rounded-full">
+                    Sukses Terkirim
+                </span>
+                <h2 class="font-heading text-2xl font-extrabold text-cabi-dark pt-1">Pesanan Berhasil Dikirim!</h2>
+                <div class="inline-block bg-gray-100 px-3.5 py-1.5 rounded-xl text-xs font-mono font-bold text-gray-700 mt-1 border border-gray-200">
+                    ID Order: <span id="success-order-id" class="text-cabi-orange">#------</span>
+                </div>
+            </div>
+
+            <!-- Pesan Penjelasan -->
+            <p class="text-xs sm:text-sm text-gray-600 leading-relaxed">
+                Pesanan kamu telah tercatat di sistem dan draf WhatsApp telah terbuka. Pesanan akan segera diproses oleh admin Cabi Snack.
+            </p>
+
+            <!-- Tombol Aksi -->
+            <div class="pt-2">
+                <button type="button" onclick="window.closeSuccessModal()" class="w-full bg-cabi-orange hover:bg-orange-600 text-white font-heading font-bold py-3.5 rounded-2xl shadow-lg hover:shadow-orange-200 transition-all transform hover:-translate-y-0.5 active:scale-95 flex items-center justify-center space-x-2">
+                    <span class="material-symbols-outlined text-base">home</span>
+                    <span>Selesai & Kembali ke Menu Utama</span>
+                </button>
+            </div>
+        </div>
     </div>
 
     <!-- JavaScript Application Logic -->
