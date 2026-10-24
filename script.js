@@ -1,10 +1,10 @@
 /* ==========================================================================
-   CABI SNACK - BUYER SCRIPT (SHOWCASE CAROUSEL & FIRESTORE ORDER SUBMISSION)
+   CABI SNACK - BUYER SCRIPT (SHOWCASE CAROUSEL & ATOMIC CHECKOUT STOCK REDUCTION)
    ========================================================================== */
 
    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
    import { 
-       getFirestore, collection, doc, onSnapshot, setDoc, addDoc, serverTimestamp 
+       getFirestore, collection, doc, onSnapshot, setDoc, writeBatch, serverTimestamp 
    } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
    
    // Konfigurasi Firebase Firestore
@@ -33,8 +33,7 @@
        { id: 'teh-manis', name: 'Cabi Teh Manis', price: 8000, img: 'images/cabi-teh-manis.png', desc: 'Es teh manis dingin segar racikan otentik.', stock: 25 }
    ];
    
-   const SERVICE_FEE = 2000;
-   const TARGET_WA_NUMBER = "6281234567890";
+   const TARGET_WA_NUMBER = "62895346019419";
    
    // State Aplikasi
    let liveProducts = [];
@@ -159,7 +158,6 @@
    
        if (!badgeCard || liveProducts.length === 0) return;
    
-       // Fade Out
        badgeCard.classList.add('opacity-0');
    
        setTimeout(() => {
@@ -214,7 +212,6 @@
                }
            }
    
-           // Fade In
            badgeCard.classList.remove('opacity-0');
        }, 250);
    }
@@ -268,7 +265,7 @@
        }).join('');
    }
    
-   // 5. PEMBARUAN KERANJANG DAN BIAYA
+   // 5. PEMBARUAN KERANJANG DAN BIAYA (BEBAS BIAYA LAYANAN)
    window.updateItemQty = function(productId, delta) {
        if (!isStoreOpen && delta > 0) return;
    
@@ -300,16 +297,22 @@
            }
        });
    
-       const total = subtotal > 0 ? subtotal + SERVICE_FEE : 0;
+       const total = subtotal;
    
-       document.getElementById('summary-subtotal').innerText = 'Rp ' + subtotal.toLocaleString('id-ID');
-       document.getElementById('summary-service-fee').innerText = subtotal > 0 ? 'Rp ' + SERVICE_FEE.toLocaleString('id-ID') : 'Rp 0';
-       document.getElementById('summary-total').innerText = 'Rp ' + total.toLocaleString('id-ID');
-       document.getElementById('mobile-sticky-total').innerText = 'Rp ' + total.toLocaleString('id-ID');
-       document.getElementById('selected-items-count').innerText = `${totalItems} Porsi Dipilih`;
+       const subtotalEl = document.getElementById('summary-subtotal');
+       if (subtotalEl) subtotalEl.innerText = 'Rp ' + subtotal.toLocaleString('id-ID');
+   
+       const totalEl = document.getElementById('summary-total');
+       if (totalEl) totalEl.innerText = 'Rp ' + total.toLocaleString('id-ID');
+   
+       const mobileTotalEl = document.getElementById('mobile-sticky-total');
+       if (mobileTotalEl) mobileTotalEl.innerText = 'Rp ' + total.toLocaleString('id-ID');
+   
+       const countEl = document.getElementById('selected-items-count');
+       if (countEl) countEl.innerText = `${totalItems} Porsi Dipilih`;
    }
    
-   // 6. NAVIGASI LAYAR PEMESANAN (TETAP BISA MEMBUKA APABILA TOKO TUTUP)
+   // 6. NAVIGASI LAYAR PEMESANAN (SPA DOM TOGGLE)
    window.showOrderPage = function() {
        document.getElementById('landing-page-view').classList.add('hidden');
        document.getElementById('order-page-view').classList.remove('hidden');
@@ -320,6 +323,13 @@
        document.getElementById('order-page-view').classList.add('hidden');
        document.getElementById('landing-page-view').classList.remove('hidden');
        window.scrollTo({ top: 0, behavior: 'smooth' });
+   };
+   
+   // Menutup Modal Sukses & Kembali ke Menu Utama
+   window.closeSuccessModal = function() {
+       const modal = document.getElementById('order-success-modal');
+       if (modal) modal.classList.add('hidden');
+       window.showLandingPage();
    };
    
    // 7. EFEK 3D MOUSE PARALLAX HERO SECTION
@@ -362,7 +372,7 @@
        });
    }
    
-   // 8. CHECKOUT WHATSAPP & SIMPAN PESANAN PENDING KE FIRESTORE
+   // 8. CHECKOUT ATOMIK (SIMPAN PESANAN, LACAK GA4, & POTONG STOK OTOMATIS)
    window.triggerOrderSubmit = function() {
        const form = document.getElementById('full-order-form');
        if (form.reportValidity()) {
@@ -389,37 +399,48 @@
        let subtotal = 0;
        let totalItems = 0;
    
-       liveProducts.forEach(p => {
-           const qty = orderCart[p.id] || 0;
+       // 1. Pengecekan stok terakhir sebelum proses pemesanan
+       for (const [prodId, qty] of Object.entries(orderCart)) {
            if (qty > 0) {
-               if (qty > p.stock) {
-                   alert(`Maaf, stok ${p.name} tidak mencukupi (Tersisa: ${p.stock}).`);
+               const prod = liveProducts.find(p => p.id === prodId);
+               if (!prod) continue;
+   
+               const currentStock = prod.stock ?? 0;
+               if (qty > currentStock) {
+                   alert(`Stok untuk menu "${prod.name}" tidak mencukupi!\n\nSisa stok: ${currentStock}\nJumlah dipesan: ${qty}\n\nSilakan kurangi jumlah porsi pesanan Anda.`);
                    return;
                }
+   
                totalItems += qty;
-               const itemTotal = p.price * qty;
+               const itemTotal = prod.price * qty;
                subtotal += itemTotal;
-               itemsText += `• *${p.name}* (x${qty}) = Rp ${itemTotal.toLocaleString('id-ID')}\n`;
-               
+               itemsText += `- ${prod.name} x${qty} = Rp ${itemTotal.toLocaleString('id-ID')}\n`;
+   
                itemsArray.push({
-                   id: p.id,
-                   name: p.name,
+                   id: prod.id,
+                   name: prod.name,
                    qty: qty,
-                   price: p.price
+                   price: prod.price
                });
            }
-       });
+       }
    
        if (totalItems === 0) {
            alert('Silakan pilih minimal 1 porsi menu sebelum mengirim pesanan.');
            return;
        }
    
-       const grandTotal = subtotal + SERVICE_FEE;
+       const grandTotal = subtotal;
    
-       // SIMPAN DOKUMEN PESANAN BARU DENGAN STATUS "PENDING"
-       let orderDocId = "";
+       // 2. Operasi Atomik: Simpan Dokumen Pesanan (PENDING) & Potong Stok Produk di Firestore
+       const newOrderRef = doc(collection(db, 'orders'));
+       const orderDocId = newOrderRef.id;
+       const shortId = `#${orderDocId.substring(0, 6).toUpperCase()}`;
+   
        try {
+           const batch = writeBatch(db);
+   
+           // Simpan data pesanan baru berstatus PENDING (tanpa biaya layanan)
            const orderData = {
                name: name,
                phone: phone,
@@ -428,43 +449,76 @@
                notes: notes ? notes : '-',
                items: itemsArray,
                subtotal: subtotal,
-               serviceFee: SERVICE_FEE,
+               serviceFee: 0,
                totalPrice: grandTotal,
                status: "PENDING",
                createdAt: serverTimestamp()
            };
+           batch.set(newOrderRef, orderData);
    
-           const docRef = await addDoc(collection(db, 'orders'), orderData);
-           orderDocId = docRef.id;
+           // Kurangi stok setiap produk yang dipesan di koleksi products
+           for (const item of itemsArray) {
+               const prod = liveProducts.find(p => p.id === item.id);
+               const currentStock = prod ? (prod.stock ?? 0) : 0;
+               const prodRef = doc(db, 'products', item.id);
+               batch.update(prodRef, { stock: Math.max(0, currentStock - item.qty) });
+           }
+   
+           await batch.commit();
        } catch (err) {
-           console.error("Gagal menyimpan pesanan ke Firestore:", err);
-           alert("⚠️ Terjadi ralat saat mengirim data pesanan ke database. Silakan coba lagi.");
+           console.error("Gagal memproses pesanan dan pemotongan stok:", err);
+           alert("Terjadi ralat saat mengirim data pesanan ke database. Silakan coba lagi.");
            return;
        }
    
-       // DRAF PESAN WHATSAPP UNTUK ADMIN
-       let message = `Halo *Cabi Snack*! Saya mau Pre-Order:\n\n`;
-       message += `🆔 *ID Order:* #${orderDocId.substring(0, 6).toUpperCase()}\n`;
-       message += `*--- DETAIL PESANAN ---*\n`;
-       message += itemsText;
-       message += `\n*Subtotal:* Rp ${subtotal.toLocaleString('id-ID')}\n`;
-       message += `*Biaya Layanan:* Rp ${SERVICE_FEE.toLocaleString('id-ID')}\n`;
-       message += `*TOTAL PEMBAYARAN:* *Rp ${grandTotal.toLocaleString('id-ID')}*\n\n`;
-       message += `*--- DATA PEMESAN ---*\n`;
-       message += `👤 *Nama:* ${name}\n`;
-       message += `📞 *No. WA:* ${phone}\n`;
-       message += `🛵 *Metode:* ${method}\n`;
-       message += `⏰ *Jam Ambil:* ${time}\n`;
-       message += `📍 *Catatan:* ${notes ? notes : '-'}\n\n`;
-       message += `Mohon segera dikonfirmasi ya. Terima kasih! 🙏`;
+       // 3. Susun Draf Pesan WhatsApp Bersih & Sederhana
+       let message = "Halo Admin Cabi Snack, saya ingin memesan:\n\n";
+       message += `ID Order: ${shortId}\n\n`;
+       message += "Data Pemesan:\n";
+       message += `Nama: ${name}\n`;
+       message += `No. WhatsApp: ${phone}\n`;
+       message += `Metode: ${method}\n`;
+       message += `Jam Ambil: ${time}\n`;
+       message += `Catatan: ${notes ? notes : '-'}\n\n`;
+       message += "Detail Pesanan:\n";
+       message += itemsText.trimEnd() + "\n\n";
+       message += `Total Pembayaran: Rp ${grandTotal.toLocaleString('id-ID')}\n\n`;
+       message += "Mohon diproses ya. Terima kasih!";
    
        const encodedMessage = encodeURIComponent(message);
        const waUrl = `https://wa.me/${TARGET_WA_NUMBER}?text=${encodedMessage}`;
    
-       // RESET KERANJANG DAN BUKA WHATSAPP
+       // 4. Lacak Event Konversi Checkout ke Google Analytics 4 (GA4)
+       if (typeof gtag === 'function') {
+           gtag('event', 'generate_lead', {
+               event_category: 'Checkout',
+               event_label: 'Tombol WhatsApp Diklik',
+               value: grandTotal,
+               currency: 'IDR',
+               order_id: shortId
+           });
+       }
+   
+       // 5. Buka WhatsApp
+       window.open(waUrl, '_blank');
+   
+       // 6. Tampilkan Modal Pop-up Sukses
+       const successModal = document.getElementById('order-success-modal');
+       const successIdEl = document.getElementById('success-order-id');
+       if (successIdEl) successIdEl.innerText = shortId;
+       if (successModal) successModal.classList.remove('hidden');
+   
+       // 7. Reset Formulir & Kosongkan Keranjang Belanja
+       const form = document.getElementById('full-order-form');
+       if (form) {
+           form.reset();
+           const methodSelect = document.getElementById('order-cust-method');
+           const timeSelect = document.getElementById('order-cust-time');
+           if (methodSelect) methodSelect.value = 'Pick up di Kampus';
+           if (timeSelect) timeSelect.value = '12:00 WIB';
+       }
+   
        orderCart = {};
        renderMenuCatalog();
        calculateTotals();
-       
-       window.open(waUrl, '_blank');
    }
